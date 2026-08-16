@@ -2,6 +2,12 @@
 
 A compact MPRIS media control for the Omarchy bar.
 
+## Demo
+
+![Now Playing widget](docs/now-playing.png)
+
+[Watch the media widget demo](docs/media-widget.mp4)
+
 ## Quick Start
 
 ```bash
