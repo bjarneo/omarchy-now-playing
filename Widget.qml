@@ -28,11 +28,15 @@ BarWidget {
   readonly property real maxLabelWidth: Style.space(Math.max(120, Number(setting("maxWidth", 220)) || 220))
   readonly property color pillFill: Qt.rgba(0, 0, 0, 0)
   property bool controlsVisible: false
+  property bool verticalPopupOpen: false
   readonly property color pillBorder: Style.controlBorder(false, controlsVisible, foreground, Color.accent)
 
   HoverHandler {
     id: hoverHandler
-    onHoveredChanged: root.syncControlsVisibility()
+    onHoveredChanged: {
+      root.syncControlsVisibility()
+      root.syncVerticalPopup()
+    }
   }
 
   Timer {
@@ -41,12 +45,35 @@ BarWidget {
     onTriggered: root.controlsVisible = false
   }
 
+  Timer {
+    id: verticalPopupHide
+    interval: 240
+    onTriggered: root.verticalPopupOpen = false
+  }
+
   function syncControlsVisibility() {
+    if (vertical) {
+      controlsHide.stop()
+      controlsVisible = false
+      return
+    }
     if (hoverHandler.hovered || previousControl.tooltipHovered || playControl.tooltipHovered || nextControl.tooltipHovered) {
       controlsHide.stop()
       controlsVisible = true
     } else if (controlsVisible) {
       controlsHide.restart()
+    }
+  }
+
+  function syncVerticalPopup() {
+    if (!vertical) {
+      verticalPopupHide.stop()
+      verticalPopupOpen = false
+    } else if (hoverHandler.hovered || verticalPopup.containsMouse) {
+      verticalPopupHide.stop()
+      verticalPopupOpen = true
+    } else if (verticalPopupOpen) {
+      verticalPopupHide.restart()
     }
   }
 
@@ -64,6 +91,10 @@ BarWidget {
     for (var j = 0; j < controls.length; j++) bar.registerClickTarget(controls[j])
   }
 
+  readonly property bool opened: verticalPopupOpen
+  function close() { verticalPopupOpen = false }
+  function closeForPopoutSwitch() { close() }
+
   Timer {
     id: marqueeStart
     interval: 180
@@ -74,11 +105,18 @@ BarWidget {
   }
 
   onLabelChanged: marqueeStart.restart()
-  onVisibleChanged: if (!visible) controlsVisible = false
+  onVerticalChanged: {
+    syncControlsVisibility()
+    syncVerticalPopup()
+  }
+  onVisibleChanged: if (!visible) {
+    controlsVisible = false
+    verticalPopupOpen = false
+  }
   Component.onCompleted: Qt.callLater(function() { root.prioritizeControls() })
 
-  visible: !vertical && title !== ""
-  implicitWidth: visible ? content.implicitWidth + Style.space(18) : 0
+  visible: title !== ""
+  implicitWidth: visible ? (vertical ? barSize : content.implicitWidth + Style.space(18)) : 0
   implicitHeight: barSize
 
   Behavior on implicitWidth { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
@@ -90,7 +128,7 @@ BarWidget {
     bar: root.bar
     text: " "
     dimmed: !root.playing
-    tooltipText: root.artist ? root.artist + " - " + root.title : root.title
+    tooltipText: root.vertical ? "" : (root.artist ? root.artist + " - " + root.title : root.title)
     onPressed: function(mouseButton) { root.controlPlayer(mouseButton) }
 
     Rectangle {
@@ -110,9 +148,19 @@ BarWidget {
       Behavior on border.color { ColorAnimation { duration: 120 } }
     }
 
+    Text {
+      anchors.centerIn: parent
+      visible: root.vertical
+      text: root.playing ? "\u{f03e4}" : "\u{f040a}"
+      color: root.foreground
+      font.family: root.bar ? root.bar.fontFamily : Style.font.family
+      font.pixelSize: Style.font.bodySmall
+    }
+
     Item {
       id: content
       anchors.centerIn: parent
+      visible: !root.vertical
       implicitWidth: Math.max(Style.space(78), glyph.implicitWidth + Style.space(6) + labelClip.normalWidth)
       width: implicitWidth
       height: parent.height
@@ -125,6 +173,7 @@ BarWidget {
         foreground: root.foreground
         fixedWidth: Style.space(20)
         fixedHeight: root.barSize
+        visible: !root.vertical
         interactive: root.controlsVisible
         opacity: root.controlsVisible ? (root.player && root.player.canGoPrevious ? 1 : 0.45) : 0
         pressable: root.player && root.player.canGoPrevious
@@ -160,6 +209,7 @@ BarWidget {
         foreground: root.foreground
         fixedWidth: Style.space(20)
         fixedHeight: root.barSize
+        visible: !root.vertical
         interactive: root.controlsVisible
         opacity: root.controlsVisible ? 1 : 0
         tooltipText: root.artist ? root.artist + " - " + root.title : root.title
@@ -178,6 +228,7 @@ BarWidget {
         foreground: root.foreground
         fixedWidth: Style.space(20)
         fixedHeight: root.barSize
+        visible: !root.vertical
         interactive: root.controlsVisible
         opacity: root.controlsVisible ? (root.player && root.player.canGoNext ? 1 : 0.45) : 0
         pressable: root.player && root.player.canGoNext
@@ -246,6 +297,73 @@ BarWidget {
             GradientStop { position: 0; color: Qt.rgba(root.pillFill.r, root.pillFill.g, root.pillFill.b, 0) }
             GradientStop { position: 1; color: root.pillFill }
           }
+        }
+      }
+    }
+  }
+
+  PopupCard {
+    id: verticalPopup
+    anchorItem: button
+    bar: root.bar
+    owner: root
+    open: root.vertical && root.verticalPopupOpen
+    triggerMode: "hover"
+    contentWidth: verticalPopup.fittedContentWidth(Style.space(240))
+    contentHeight: verticalPopup.fittedContentHeight(verticalContent.implicitHeight)
+    onContainsMouseChanged: root.syncVerticalPopup()
+
+    Column {
+      id: verticalContent
+      width: parent.width
+      spacing: Style.space(8)
+
+      Text {
+        text: root.title
+        width: parent.width
+        color: root.foreground
+        font.family: root.bar ? root.bar.fontFamily : Style.font.family
+        font.pixelSize: Style.font.subtitle
+        font.bold: true
+        elide: Text.ElideRight
+      }
+
+      Text {
+        text: root.artist
+        width: parent.width
+        color: Qt.darker(root.foreground, 1.3)
+        font.family: root.bar ? root.bar.fontFamily : Style.font.family
+        font.pixelSize: Style.font.bodySmall
+        elide: Text.ElideRight
+        visible: text !== ""
+      }
+
+      Row {
+        anchors.horizontalCenter: parent.horizontalCenter
+        spacing: Style.space(6)
+
+        Button {
+          iconText: "\u{f04ae}"
+          foreground: root.foreground
+          enabled: root.player && root.player.canGoPrevious
+          opacity: enabled ? 1 : 0.45
+          onClicked: if (root.player) root.player.previous()
+        }
+
+        Button {
+          iconText: root.playing ? "\u{f03e4}" : "\u{f040a}"
+          foreground: root.foreground
+          enabled: root.player && (root.player.canTogglePlaying || root.player.canPlay || root.player.canPause)
+          opacity: enabled ? 1 : 0.45
+          onClicked: if (root.player) root.player.togglePlaying()
+        }
+
+        Button {
+          iconText: "\u{f04ad}"
+          foreground: root.foreground
+          enabled: root.player && root.player.canGoNext
+          opacity: enabled ? 1 : 0.45
+          onClicked: if (root.player) root.player.next()
         }
       }
     }
