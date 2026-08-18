@@ -202,9 +202,6 @@ BarWidget {
         anchors.verticalCenter: parent.verticalCenter
         readonly property real overflow: Math.max(0, labelText.implicitWidth - width)
 
-        Behavior on x { XAnimator { duration: 140; easing.type: Easing.OutCubic } }
-        Behavior on width { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
-
         Text {
           id: labelText
           anchors.verticalCenter: parent.verticalCenter
