@@ -124,8 +124,8 @@ BarWidget {
         foreground: root.foreground
         fixedWidth: Style.space(20)
         fixedHeight: root.barSize
-        visible: root.controlsVisible
-        dimmed: !root.player || !root.player.canGoPrevious
+        interactive: root.controlsVisible
+        opacity: root.controlsVisible ? (root.player && root.player.canGoPrevious ? 1 : 0.45) : 0
         pressable: root.player && root.player.canGoPrevious
         tooltipText: qsTr("Previous track")
         x: 0
@@ -140,12 +140,14 @@ BarWidget {
       Text {
         id: glyph
         anchors.verticalCenter: parent.verticalCenter
-        visible: !root.controlsVisible
+        opacity: root.controlsVisible ? 0 : 1
         x: 0
         text: root.playing ? "\u{f03e4}" : "\u{f040a}"
         color: root.foreground
         font.family: root.bar ? root.bar.fontFamily : Style.font.family
         font.pixelSize: Style.font.bodySmall
+
+        Behavior on opacity { OpacityAnimator { duration: 120; easing.type: Easing.OutCubic } }
       }
 
       WidgetButton {
@@ -156,7 +158,8 @@ BarWidget {
         foreground: root.foreground
         fixedWidth: Style.space(20)
         fixedHeight: root.barSize
-        visible: root.controlsVisible
+        interactive: root.controlsVisible
+        opacity: root.controlsVisible ? 1 : 0
         tooltipText: root.artist ? root.artist + " - " + root.title : root.title
         x: previousControl.width + Style.space(6)
         anchors.verticalCenter: parent.verticalCenter
@@ -172,8 +175,8 @@ BarWidget {
         foreground: root.foreground
         fixedWidth: Style.space(20)
         fixedHeight: root.barSize
-        visible: root.controlsVisible
-        dimmed: !root.player || !root.player.canGoNext
+        interactive: root.controlsVisible
+        opacity: root.controlsVisible ? (root.player && root.player.canGoNext ? 1 : 0.45) : 0
         pressable: root.player && root.player.canGoNext
         tooltipText: qsTr("Next track")
         x: playControl.x + playControl.width + Style.space(6)
