@@ -4,7 +4,7 @@ A compact MPRIS media control for the Omarchy bar.
 
 ## Demo
 
-![Now Playing widget](docs/now-playing.png)
+![Now Playing widget](preview.png)
 
 [Watch the media widget demo](docs/media-widget.mp4)
 
