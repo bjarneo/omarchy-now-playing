@@ -243,7 +243,7 @@ BarWidget {
           anchors.verticalCenter: parent.verticalCenter
           width: Math.min(Style.space(24), parent.width)
           height: parent.height
-          visible: labelText.implicitWidth > parent.width
+          visible: parent.width > 0
           gradient: Gradient {
             orientation: Gradient.Horizontal
             GradientStop { position: 0; color: Qt.rgba(root.pillFill.r, root.pillFill.g, root.pillFill.b, 0) }
