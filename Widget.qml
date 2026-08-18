@@ -28,27 +28,17 @@ BarWidget {
   readonly property real maxLabelWidth: Style.space(Math.max(120, Number(setting("maxWidth", 220)) || 220))
   readonly property color pillFill: Qt.rgba(0, 0, 0, 0)
   property bool controlsVisible: false
-  property bool verticalPopupOpen: false
   readonly property color pillBorder: Style.controlBorder(false, controlsVisible, foreground, Color.accent)
 
   HoverHandler {
     id: hoverHandler
-    onHoveredChanged: {
-      root.syncControlsVisibility()
-      root.syncVerticalPopup()
-    }
+    onHoveredChanged: root.syncControlsVisibility()
   }
 
   Timer {
     id: controlsHide
     interval: 180
     onTriggered: root.controlsVisible = false
-  }
-
-  Timer {
-    id: verticalPopupHide
-    interval: 240
-    onTriggered: root.verticalPopupOpen = false
   }
 
   function syncControlsVisibility() {
@@ -65,18 +55,6 @@ BarWidget {
     }
   }
 
-  function syncVerticalPopup() {
-    if (!vertical) {
-      verticalPopupHide.stop()
-      verticalPopupOpen = false
-    } else if (hoverHandler.hovered || verticalPopup.containsMouse) {
-      verticalPopupHide.stop()
-      verticalPopupOpen = true
-    } else if (verticalPopupOpen) {
-      verticalPopupHide.restart()
-    }
-  }
-
   function controlPlayer(mouseButton) {
     if (!player) return
     if (mouseButton === Qt.RightButton && player.canGoNext) player.next()
@@ -86,14 +64,10 @@ BarWidget {
 
   function prioritizeControls() {
     if (!bar || !bar.registerClickTarget || !bar.unregisterClickTarget) return
-    var controls = [previousControl, playControl, nextControl]
+    var controls = [previousControl, playControl, nextControl, verticalPreviousControl, verticalPlayControl, verticalNextControl]
     for (var i = 0; i < controls.length; i++) bar.unregisterClickTarget(controls[i])
     for (var j = 0; j < controls.length; j++) bar.registerClickTarget(controls[j])
   }
-
-  readonly property bool opened: verticalPopupOpen
-  function close() { verticalPopupOpen = false }
-  function closeForPopoutSwitch() { close() }
 
   Timer {
     id: marqueeStart
@@ -105,19 +79,13 @@ BarWidget {
   }
 
   onLabelChanged: marqueeStart.restart()
-  onVerticalChanged: {
-    syncControlsVisibility()
-    syncVerticalPopup()
-  }
-  onVisibleChanged: if (!visible) {
-    controlsVisible = false
-    verticalPopupOpen = false
-  }
+  onVerticalChanged: syncControlsVisibility()
+  onVisibleChanged: if (!visible) controlsVisible = false
   Component.onCompleted: Qt.callLater(function() { root.prioritizeControls() })
 
   visible: title !== ""
   implicitWidth: visible ? (vertical ? barSize : content.implicitWidth + Style.space(18)) : 0
-  implicitHeight: barSize
+  implicitHeight: vertical ? verticalControls.implicitHeight : barSize
 
   Behavior on implicitWidth { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
 
@@ -127,7 +95,7 @@ BarWidget {
     clip: true
     bar: root.bar
     text: " "
-    dimmed: !root.playing
+    dimmed: !root.vertical && !root.playing
     tooltipText: root.vertical ? "" : (root.artist ? root.artist + " - " + root.title : root.title)
     onPressed: function(mouseButton) { root.controlPlayer(mouseButton) }
 
@@ -148,13 +116,57 @@ BarWidget {
       Behavior on border.color { ColorAnimation { duration: 120 } }
     }
 
-    Text {
+    Column {
+      id: verticalControls
       anchors.centerIn: parent
       visible: root.vertical
-      text: root.playing ? "\u{f03e4}" : "\u{f040a}"
-      color: root.foreground
-      font.family: root.bar ? root.bar.fontFamily : Style.font.family
-      font.pixelSize: Style.font.bodySmall
+      spacing: Style.space(2)
+
+      WidgetButton {
+        id: verticalPreviousControl
+        bar: root.bar
+        text: "\u{f04ae}"
+        fontSize: Style.font.bodySmall
+        foreground: root.foreground
+        fixedWidth: root.barSize
+        fixedHeight: Style.space(24)
+        dimmed: !root.player || !root.player.canGoPrevious
+        pressable: root.player && root.player.canGoPrevious
+        tooltipText: qsTr("Previous track")
+        onPressed: function(mouseButton) {
+          if (mouseButton === Qt.LeftButton && root.player && root.player.canGoPrevious)
+            root.player.previous()
+        }
+      }
+
+      WidgetButton {
+        id: verticalPlayControl
+        bar: root.bar
+        text: root.playing ? "\u{f03e4}" : "\u{f040a}"
+        fontSize: Style.font.bodySmall
+        foreground: root.foreground
+        fixedWidth: root.barSize
+        fixedHeight: Style.space(24)
+        tooltipText: root.artist ? root.artist + " - " + root.title : root.title
+        onPressed: function(mouseButton) { root.controlPlayer(mouseButton) }
+      }
+
+      WidgetButton {
+        id: verticalNextControl
+        bar: root.bar
+        text: "\u{f04ad}"
+        fontSize: Style.font.bodySmall
+        foreground: root.foreground
+        fixedWidth: root.barSize
+        fixedHeight: Style.space(24)
+        dimmed: !root.player || !root.player.canGoNext
+        pressable: root.player && root.player.canGoNext
+        tooltipText: qsTr("Next track")
+        onPressed: function(mouseButton) {
+          if (mouseButton === Qt.LeftButton && root.player && root.player.canGoNext)
+            root.player.next()
+        }
+      }
     }
 
     Item {
@@ -302,70 +314,4 @@ BarWidget {
     }
   }
 
-  PopupCard {
-    id: verticalPopup
-    anchorItem: button
-    bar: root.bar
-    owner: root
-    open: root.vertical && root.verticalPopupOpen
-    triggerMode: "hover"
-    contentWidth: verticalPopup.fittedContentWidth(Style.space(240))
-    contentHeight: verticalPopup.fittedContentHeight(verticalContent.implicitHeight)
-    onContainsMouseChanged: root.syncVerticalPopup()
-
-    Column {
-      id: verticalContent
-      width: parent.width
-      spacing: Style.space(8)
-
-      Text {
-        text: root.title
-        width: parent.width
-        color: root.foreground
-        font.family: root.bar ? root.bar.fontFamily : Style.font.family
-        font.pixelSize: Style.font.subtitle
-        font.bold: true
-        elide: Text.ElideRight
-      }
-
-      Text {
-        text: root.artist
-        width: parent.width
-        color: Qt.darker(root.foreground, 1.3)
-        font.family: root.bar ? root.bar.fontFamily : Style.font.family
-        font.pixelSize: Style.font.bodySmall
-        elide: Text.ElideRight
-        visible: text !== ""
-      }
-
-      Row {
-        anchors.horizontalCenter: parent.horizontalCenter
-        spacing: Style.space(6)
-
-        Button {
-          iconText: "\u{f04ae}"
-          foreground: root.foreground
-          enabled: root.player && root.player.canGoPrevious
-          opacity: enabled ? 1 : 0.45
-          onClicked: if (root.player) root.player.previous()
-        }
-
-        Button {
-          iconText: root.playing ? "\u{f03e4}" : "\u{f040a}"
-          foreground: root.foreground
-          enabled: root.player && (root.player.canTogglePlaying || root.player.canPlay || root.player.canPause)
-          opacity: enabled ? 1 : 0.45
-          onClicked: if (root.player) root.player.togglePlaying()
-        }
-
-        Button {
-          iconText: "\u{f04ad}"
-          foreground: root.foreground
-          enabled: root.player && root.player.canGoNext
-          opacity: enabled ? 1 : 0.45
-          onClicked: if (root.player) root.player.next()
-        }
-      }
-    }
-  }
 }
