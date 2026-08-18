@@ -27,7 +27,42 @@ BarWidget {
   readonly property color foreground: bar ? bar.barForeground : Color.foreground
   readonly property real maxLabelWidth: Style.space(Math.max(120, Number(setting("maxWidth", 220)) || 220))
   readonly property color pillFill: Color.background
-  readonly property color pillBorder: Style.controlBorder(false, button.tooltipHovered, foreground, Color.accent)
+  property bool controlsVisible: false
+  readonly property color pillBorder: Style.controlBorder(false, controlsVisible, foreground, Color.accent)
+
+  HoverHandler {
+    id: hoverHandler
+    onHoveredChanged: root.syncControlsVisibility()
+  }
+
+  Timer {
+    id: controlsHide
+    interval: 180
+    onTriggered: root.controlsVisible = false
+  }
+
+  function syncControlsVisibility() {
+    if (hoverHandler.hovered || previousControl.tooltipHovered || playControl.tooltipHovered || nextControl.tooltipHovered) {
+      controlsHide.stop()
+      controlsVisible = true
+    } else if (controlsVisible) {
+      controlsHide.restart()
+    }
+  }
+
+  function controlPlayer(mouseButton) {
+    if (!player) return
+    if (mouseButton === Qt.RightButton && player.canGoNext) player.next()
+    else if (mouseButton === Qt.MiddleButton && player.canGoPrevious) player.previous()
+    else player.togglePlaying()
+  }
+
+  function prioritizeControls() {
+    if (!bar || !bar.registerClickTarget || !bar.unregisterClickTarget) return
+    var controls = [previousControl, playControl, nextControl]
+    for (var i = 0; i < controls.length; i++) bar.unregisterClickTarget(controls[i])
+    for (var j = 0; j < controls.length; j++) bar.registerClickTarget(controls[j])
+  }
 
   Timer {
     id: marqueeStart
@@ -39,6 +74,8 @@ BarWidget {
   }
 
   onLabelChanged: marqueeStart.restart()
+  onVisibleChanged: if (!visible) controlsVisible = false
+  Component.onCompleted: Qt.callLater(function() { root.prioritizeControls() })
 
   visible: !vertical && title !== ""
   implicitWidth: visible ? content.implicitWidth + Style.space(18) : 0
@@ -53,12 +90,7 @@ BarWidget {
     text: " "
     dimmed: !root.playing
     tooltipText: root.artist ? root.artist + " - " + root.title : root.title
-    onPressed: function(mouseButton) {
-      if (!root.player) return
-      if (mouseButton === Qt.RightButton && root.player.canGoNext) root.player.next()
-      else if (mouseButton === Qt.MiddleButton && root.player.canGoPrevious) root.player.previous()
-      else root.player.togglePlaying()
-    }
+    onPressed: function(mouseButton) { root.controlPlayer(mouseButton) }
 
     Rectangle {
       anchors.left: parent.left
@@ -70,30 +102,94 @@ BarWidget {
       z: -1
       radius: height / 2
       color: root.pillFill
-      border.width: Style.controlBorderWidth(false, button.tooltipHovered)
+      border.width: Style.controlBorderWidth(false, root.controlsVisible)
       border.color: root.pillBorder
 
       Behavior on color { ColorAnimation { duration: 120 } }
       Behavior on border.color { ColorAnimation { duration: 120 } }
     }
 
-    Row {
+    Item {
       id: content
       anchors.centerIn: parent
-      spacing: Style.space(6)
+      implicitWidth: Math.max(Style.space(78), glyph.implicitWidth + Style.space(6) + labelClip.normalWidth)
+      width: implicitWidth
+      height: parent.height
+
+      WidgetButton {
+        id: previousControl
+        bar: root.bar
+        text: "\u{f04ae}"
+        fontSize: Style.font.bodySmall
+        foreground: root.foreground
+        fixedWidth: Style.space(20)
+        fixedHeight: root.barSize
+        visible: root.controlsVisible
+        dimmed: !root.player || !root.player.canGoPrevious
+        pressable: root.player && root.player.canGoPrevious
+        tooltipText: qsTr("Previous track")
+        x: 0
+        anchors.verticalCenter: parent.verticalCenter
+        onTooltipHoveredChanged: root.syncControlsVisibility()
+        onPressed: function(mouseButton) {
+          if (mouseButton === Qt.LeftButton && root.player && root.player.canGoPrevious)
+            root.player.previous()
+        }
+      }
 
       Text {
         id: glyph
         anchors.verticalCenter: parent.verticalCenter
+        visible: !root.controlsVisible
+        x: 0
         text: root.playing ? "\u{f03e4}" : "\u{f040a}"
         color: root.foreground
         font.family: root.bar ? root.bar.fontFamily : Style.font.family
         font.pixelSize: Style.font.bodySmall
       }
 
+      WidgetButton {
+        id: playControl
+        bar: root.bar
+        text: root.playing ? "\u{f03e4}" : "\u{f040a}"
+        fontSize: Style.font.bodySmall
+        foreground: root.foreground
+        fixedWidth: Style.space(20)
+        fixedHeight: root.barSize
+        visible: root.controlsVisible
+        tooltipText: root.artist ? root.artist + " - " + root.title : root.title
+        x: previousControl.width + Style.space(6)
+        anchors.verticalCenter: parent.verticalCenter
+        onTooltipHoveredChanged: root.syncControlsVisibility()
+        onPressed: function(mouseButton) { root.controlPlayer(mouseButton) }
+      }
+
+      WidgetButton {
+        id: nextControl
+        bar: root.bar
+        text: "\u{f04ad}"
+        fontSize: Style.font.bodySmall
+        foreground: root.foreground
+        fixedWidth: Style.space(20)
+        fixedHeight: root.barSize
+        visible: root.controlsVisible
+        dimmed: !root.player || !root.player.canGoNext
+        pressable: root.player && root.player.canGoNext
+        tooltipText: qsTr("Next track")
+        x: playControl.x + playControl.width + Style.space(6)
+        anchors.verticalCenter: parent.verticalCenter
+        onTooltipHoveredChanged: root.syncControlsVisibility()
+        onPressed: function(mouseButton) {
+          if (mouseButton === Qt.LeftButton && root.player && root.player.canGoNext)
+            root.player.next()
+        }
+      }
+
       Item {
         id: labelClip
-        width: Math.min(root.maxLabelWidth, labelText.implicitWidth)
+        readonly property real normalWidth: Math.min(root.maxLabelWidth, labelText.implicitWidth)
+        x: root.controlsVisible ? nextControl.x + nextControl.width + Style.space(6) : glyph.x + glyph.implicitWidth + Style.space(6)
+        width: root.controlsVisible ? Math.max(0, parent.width - x) : Math.min(normalWidth, parent.width - x)
         height: glyph.implicitHeight
         clip: true
         anchors.verticalCenter: parent.verticalCenter
