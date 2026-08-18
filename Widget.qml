@@ -26,7 +26,7 @@ BarWidget {
   readonly property string label: artist ? artist + " - " + title : title
   readonly property color foreground: bar ? bar.barForeground : Color.foreground
   readonly property real maxLabelWidth: Style.space(Math.max(120, Number(setting("maxWidth", 220)) || 220))
-  readonly property color pillFill: Color.background
+  readonly property color pillFill: Qt.rgba(0, 0, 0, 0)
   property bool controlsVisible: false
   readonly property color pillBorder: Style.controlBorder(false, controlsVisible, foreground, Color.accent)
 
