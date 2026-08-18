@@ -86,6 +86,7 @@ BarWidget {
   WidgetButton {
     id: button
     anchors.fill: parent
+    clip: true
     bar: root.bar
     text: " "
     dimmed: !root.playing
