@@ -129,6 +129,7 @@ BarWidget {
         pressable: root.player && root.player.canGoPrevious
         tooltipText: qsTr("Previous track")
         x: 0
+        z: 1
         anchors.verticalCenter: parent.verticalCenter
         onTooltipHoveredChanged: root.syncControlsVisibility()
         onPressed: function(mouseButton) {
@@ -162,6 +163,7 @@ BarWidget {
         opacity: root.controlsVisible ? 1 : 0
         tooltipText: root.artist ? root.artist + " - " + root.title : root.title
         x: previousControl.width + Style.space(6)
+        z: 1
         anchors.verticalCenter: parent.verticalCenter
         onTooltipHoveredChanged: root.syncControlsVisibility()
         onPressed: function(mouseButton) { root.controlPlayer(mouseButton) }
@@ -180,6 +182,7 @@ BarWidget {
         pressable: root.player && root.player.canGoNext
         tooltipText: qsTr("Next track")
         x: playControl.x + playControl.width + Style.space(6)
+        z: 1
         anchors.verticalCenter: parent.verticalCenter
         onTooltipHoveredChanged: root.syncControlsVisibility()
         onPressed: function(mouseButton) {
@@ -197,6 +200,9 @@ BarWidget {
         clip: true
         anchors.verticalCenter: parent.verticalCenter
         readonly property real overflow: Math.max(0, labelText.implicitWidth - width)
+
+        Behavior on x { XAnimator { duration: 140; easing.type: Easing.OutCubic } }
+        Behavior on width { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
 
         Text {
           id: labelText
